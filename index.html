@@ -1,62 +1,191 @@
-<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Platby Edennium</title><style>
-:root{--g:#1f4d3d;--bg:#f4f5f2;--line:#d8ddd8}*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,sans-serif;color:#172019}main{max-width:900px;margin:auto;padding:20px}.card{background:#fff;border-radius:16px;padding:24px;margin-bottom:16px;box-shadow:0 3px 18px #00000012}.hidden{display:none!important}h1,h2{color:var(--g)}label{display:block;font-weight:bold;margin-top:12px;margin-bottom:5px}input,textarea,select{width:100%;padding:11px;border:1px solid var(--line);border-radius:8px;font-size:16px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}button{border:0;border-radius:8px;padding:12px 16px;font-weight:bold;cursor:pointer}.primary{background:var(--g);color:#fff}.secondary{background:#e8ece8}.danger{background:#f5e5e5;color:#8b2222}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.sig{width:100%;height:150px;border:2px dashed #9ca69f;border-radius:9px;touch-action:none}.banner{padding:14px;background:#eef6f1;border-left:4px solid var(--g);border-radius:7px;margin-bottom:15px}.muted{color:#657068}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left}.signed{color:#18733b;font-weight:bold}.waiting{color:#956000;font-weight:bold}#loading{position:fixed;inset:0;background:#ffffffdd;display:none;place-items:center;z-index:9;font-size:20px}@media(max-width:650px){.grid{grid-template-columns:1fr}.card{padding:16px}}
-</style></head><body><div id="loading">Načítání…</div><main>
-<section id="login" class="card"><h1>Platby Edennium</h1><p class="muted">Administrace dokladů a vzdálených podpisů</p><label>E-mail</label><input id="email" type="email"><label>Heslo</label><input id="password" type="password"><div class="actions"><button class="primary" id="loginBtn">Přihlásit se</button></div><p id="loginMsg"></p></section>
-<section id="admin" class="hidden"><div class="card"><div class="actions" style="justify-content:space-between"><h1 style="margin:0">Administrace Edennium</h1><button class="secondary" id="logout">Odhlásit</button></div></div>
-<div class="card"><h2>Nový doklad</h2><div class="grid"><div><label>Číslo dokladu</label><input id="docNo" placeholder="ED-2026-001"></div><div><label>Příjemce</label><input id="recipient"></div></div><label>Účel platby</label><textarea id="purpose" rows="2"></textarea><div class="grid"><div><label>Částka (Kč)</label><input id="amount" type="number" min="0" step="0.01"></div><div><label>Stav platby</label><select id="status"><option value="transfer_pending">Bankovním převodem – k vyplacení</option><option value="transfer_paid">Bankovním převodem – vyplaceno</option><option value="cash_paid">Hotově – vyplaceno</option></select></div></div><label>Datum úhrady / vyplacení</label><input id="date" type="date"><label>Osoba jednající za Edennium</label><input id="issuer"><label>Podpis za Edennium</label><canvas id="issuerSig" class="sig"></canvas><div class="actions"><button class="danger" id="clearIssuer">Vymazat podpis</button><button class="primary" id="create">Vytvořit bezpečný podpisový odkaz</button></div><p id="created"></p></div>
-<div class="card"><h2>Doklady</h2><button class="secondary" id="refresh">↻ Obnovit</button><div style="overflow:auto"><table><thead><tr><th>Doklad</th><th>Příjemce</th><th>Částka</th><th>Stav</th><th></th></tr></thead><tbody id="docs"></tbody></table></div></div></section>
-<section id="sign" class="hidden"><div class="card"><h1>Potvrzení dokladu</h1><div id="detail"></div><div id="signControls"><label>Podpis příjemce</label><canvas id="recipientSig" class="sig"></canvas><div class="actions"><button class="danger" id="clearRecipient">Vymazat podpis</button></div><label style="font-weight:normal;display:flex;gap:8px"><input id="confirm" type="checkbox" style="width:auto">Potvrzuji správnost uvedených údajů a připojuji svůj podpis k tomuto konkrétnímu dokladu.</label><div class="actions"><button class="primary" id="signBtn">✓ Definitivně podepsat</button></div></div><div id="final" class="hidden"><div class="actions"><button class="primary" id="pdf">📄 Uložit jako PDF</button></div></div></div></section>
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Edennium – Platební doklady</title>
+<style>
+:root{--green:#1d4b3b;--light:#f4f6f3;--border:#d7ded8;--text:#18221c;--red:#9b3030}
+*{box-sizing:border-box}body{margin:0;background:var(--light);font-family:Arial,Helvetica,sans-serif;color:var(--text)}
+main{max-width:960px;margin:auto;padding:20px}.card{background:#fff;border-radius:16px;padding:24px;margin:0 0 18px;box-shadow:0 3px 18px #00000010}
+h1,h2{color:var(--green);margin-top:0}.hidden{display:none!important}.muted{color:#647068}
+label{display:block;font-weight:700;margin:13px 0 6px}input,textarea,select{width:100%;font:inherit;padding:11px;border:1px solid var(--border);border-radius:8px;background:#fff}
+textarea{min-height:75px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+button{font:inherit;font-weight:700;padding:11px 15px;border:0;border-radius:8px;cursor:pointer}.primary{background:var(--green);color:#fff}.secondary{background:#e8ece8}.danger{background:#f7e5e5;color:var(--red)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.signature{display:block;width:100%;height:150px;border:2px dashed #9ba89f;border-radius:9px;background:#fff;touch-action:none}
+.notice{background:#edf6f0;border-left:4px solid var(--green);padding:14px;border-radius:7px;line-height:1.6}
+.error{color:var(--red);font-weight:bold}.ok{color:#16713b;font-weight:bold}
+table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px solid var(--border);text-align:left}.waiting{color:#956000;font-weight:bold}.signed{color:#16713b;font-weight:bold}
+#loader{position:fixed;inset:0;background:#ffffffcc;display:none;place-items:center;z-index:99;font-size:20px}
+.small{font-size:13px}@media(max-width:650px){main{padding:10px}.card{padding:16px}.grid{grid-template-columns:1fr}table{font-size:12px}}
+</style>
+</head>
+<body>
+<div id="loader">Načítání…</div>
+<main>
+
+<section id="loginView" class="card">
+<h1>Platby Edennium</h1>
+<p class="muted">Administrace platebních dokladů a vzdálených podpisů.</p>
+<label>E-mail</label><input id="email" type="email" autocomplete="email">
+<label>Heslo</label><input id="password" type="password" autocomplete="current-password">
+<div class="actions"><button id="loginBtn" class="primary">Přihlásit se</button></div>
+<p id="loginMessage"></p>
+</section>
+
+<section id="adminView" class="hidden">
+<div class="card">
+<div class="actions" style="justify-content:space-between"><h1 style="margin:0">Administrace</h1><button id="logoutBtn" class="secondary">Odhlásit</button></div>
+</div>
+
+<div class="card">
+<h2>Vytvořit nový doklad</h2>
+<div class="grid">
+<div><label>Číslo dokladu *</label><input id="docNumber" placeholder="ED-2026-001"></div>
+<div><label>Příjemce *</label><input id="recipientName" placeholder="Jméno / název osoby"></div>
+</div>
+<label>Účel platby *</label><textarea id="purpose" placeholder="Např. honorář za vystoupení / pronájem pozemku"></textarea>
+<div class="grid">
+<div><label>Částka v Kč *</label><input id="amount" type="number" min="0" step="0.01"></div>
+<div><label>Způsob / stav platby *</label>
+<select id="paymentStatus">
+<option value="transfer_pending">Bankovním převodem – bude vyplaceno</option>
+<option value="transfer_paid">Bankovním převodem – vyplaceno</option>
+<option value="cash_paid">Hotově – vyplaceno</option>
+</select></div>
+</div>
+<div id="dateWrap"><label>Datum úhrady / vyplacení</label><input id="paymentDate" type="date"></div>
+<label>Osoba jednající za Edennium *</label><input id="issuerName" placeholder="Jméno a funkce">
+<label>Podpis za Edennium *</label>
+<canvas id="issuerCanvas" class="signature"></canvas>
+<div class="actions"><button id="clearIssuer" class="danger">Vymazat podpis</button></div>
+<div class="actions"><button id="createBtn" class="primary">Vytvořit doklad a podpisový odkaz</button></div>
+<p id="createMessage"></p>
+</div>
+
+<div class="card">
+<h2>Vytvořené doklady</h2>
+<div class="actions"><button id="refreshBtn" class="secondary">↻ Obnovit seznam</button></div>
+<div style="overflow:auto"><table><thead><tr><th>Doklad</th><th>Příjemce</th><th>Částka</th><th>Stav</th><th>Odkaz</th></tr></thead><tbody id="documentList"></tbody></table></div>
+</div>
+</section>
+
+<section id="signView" class="hidden">
+<div class="card">
+<h1>Potvrzení dokladu</h1>
+<div id="documentDetail"></div>
+<div id="recipientArea">
+<label>Podpis příjemce *</label>
+<canvas id="recipientCanvas" class="signature"></canvas>
+<div class="actions"><button id="clearRecipient" class="danger">Vymazat podpis</button></div>
+<label style="font-weight:normal;display:flex;gap:9px;align-items:flex-start"><input id="confirmation" type="checkbox" style="width:auto;margin-top:4px"><span>Potvrzuji správnost uvedených údajů a připojuji svůj podpis k tomuto konkrétnímu dokladu.</span></label>
+<div class="actions"><button id="signBtn" class="primary">Definitivně podepsat</button></div>
+</div>
+<div id="finishedArea" class="hidden">
+<p class="ok">✓ Doklad byl podepsán a uzamčen.</p>
+<div class="actions"><button id="pdfBtn" class="primary">📄 Vytisknout / uložit jako PDF</button></div>
+</div>
+</div>
+</section>
 </main>
+
+<script src="config.js"></script>
 <script type="module">
-import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
-const supabase=createClient('https://prlbahgvgihtdfwfikrp.supabase.co','sb_publishable_uKx6LbKs2UbsdnJgugv21g_NknJYtLZ');
-const $=x=>document.getElementById(x), load=x=>$('loading').style.display=x?'grid':'none';
-function Sig(c,ro=false){const ctx=c.getContext('2d');let ss=[],cur,on=false;function draw(){let r=c.getBoundingClientRect();ctx.clearRect(0,0,r.width,r.height);ctx.strokeStyle='#172019';ctx.lineWidth=2.2;ctx.lineCap='round';for(let s of ss){if(s.length<2)continue;ctx.beginPath();ctx.moveTo(...s[0]);for(let i=1;i<s.length;i++)ctx.lineTo(...s[i]);ctx.stroke()}}function size(){let r=c.getBoundingClientRect(),d=devicePixelRatio||1;c.width=r.width*d;c.height=r.height*d;ctx.setTransform(d,0,0,d,0,0);draw()}function p(e){let r=c.getBoundingClientRect();return [+(e.clientX-r.left).toFixed(1),+(e.clientY-r.top).toFixed(1)]}if(!ro){c.onpointerdown=e=>{on=true;cur=[p(e)];ss.push(cur);c.setPointerCapture(e.pointerId)};c.onpointermove=e=>{if(on){cur.push(p(e));draw()}};c.onpointerup=()=>on=false;c.onpointercancel=()=>on=false}addEventListener('resize',size);setTimeout(size,100);return{get:()=>ss,set:x=>{ss=x||[];draw()},clear:()=>{ss=[];draw()},has:()=>ss.some(x=>x.length>1)}}
-const is=new Sig($('issuerSig')),rs=new Sig($('recipientSig'));$('clearIssuer').onclick=()=>is.clear();$('clearRecipient').onclick=()=>rs.clear();
-const esc=x=>String(x??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const stat=s=>s==='cash_paid'?'Hotově – vyplaceno':s==='transfer_paid'?'Bankovním převodem – vyplaceno':'Bankovním převodem – k vyplacení';
-const url=t=>location.origin+location.pathname+'#sign='+t;
-async function docs(){const {data,error}=await supabase.rpc('get_admin_documents');if(error){console.error(error);return}$('docs').innerHTML=(data||[]).map(d=>`<tr><td>${esc(d.document_number)}</td><td>${esc(d.recipient_name)}</td><td>${Number(d.amount).toLocaleString('cs-CZ')} Kč</td><td class="${d.document_status==='signed'?'signed':'waiting'}">${d.document_status==='signed'?'✓ Podepsáno':'Čeká na podpis'}</td><td><button class="secondary" data-t="${d.signing_token}">Kopírovat</button></td></tr>`).join('');document.querySelectorAll('[data-t]').forEach(b=>b.onclick=async()=>{await navigator.clipboard.writeText(url(b.dataset.t));alert('Odkaz zkopírován.')})}
-async function admin(){const {data:{session}}=await supabase.auth.getSession();if(session){$('login').classList.add('hidden');$('admin').classList.remove('hidden');docs()}}
-$('loginBtn').onclick=async()=>{load(true);const {error}=await supabase.auth.signInWithPassword({email:$('email').value,password:$('password').value});load(false);if(error)$('loginMsg').textContent=error.message;else admin()};
-$('logout').onclick=async()=>{await supabase.auth.signOut();location.reload()};$('refresh').onclick=docs;
-$('create').onclick=async()=>{if(!is.has())return alert('Připoj podpis za Edennium.');const a={p_document_number:$('docNo').value.trim(),p_recipient_name:$('recipient').value.trim(),p_payment_purpose:$('purpose').value.trim(),p_amount:Number($('amount').value),p_payment_status:$('status').value,p_payment_date:$('date').value||null,p_issuer_name:$('issuer').value.trim(),p_issuer_signature:is.get()};if(!a.p_document_number||!a.p_recipient_name||!a.p_payment_purpose||!Number.isFinite(a.p_amount)||!a.p_issuer_name)return alert('Vyplň všechna povinná pole.');load(true);const {data,error}=await supabase.rpc('create_payment_document',a);load(false);if(error)return alert(error.message);let u=url(data[0].signing_token);$('created').innerHTML=`Doklad vytvořen. <a href="${u}" target="_blank">Otevřít podpisový odkaz</a>`;try{await navigator.clipboard.writeText(u);$('created').innerHTML+=' — odkaz byl zkopírován.'}catch(e){}docs()};
-let D,T;
-async function openSign(t){load(true);const {data,error}=await supabase.rpc('get_signed_document',{p_token:t});load(false);if(error||!data?.length){$('detail').innerHTML='<div class="banner">Doklad nebyl nalezen.</div>';return}D=data[0];T=t;$('login').classList.add('hidden');$('admin').classList.add('hidden');$('sign').classList.remove('hidden');$('detail').innerHTML=`<div class="banner"><b>Číslo dokladu:</b> ${esc(D.document_number)}<br><b>Příjemce:</b> ${esc(D.recipient_name)}<br><b>Účel:</b> ${esc(D.payment_purpose)}<br><b>Částka:</b> ${Number(D.amount).toLocaleString('cs-CZ')} Kč<br><b>Stav platby:</b> ${stat(D.payment_status)}<br><br><b>Za Edennium:</b> ${esc(D.issuer_name)}<br><canvas id="iv" class="sig" style="height:110px;margin-top:8px"></canvas></div>`;let v=new Sig($('iv'),true);v.set(D.issuer_signature);if(D.document_status==='signed'){$('signControls').classList.add('hidden');$('final').classList.remove('hidden');rs.set(D.recipient_signature)}}
-$('signBtn').onclick=async()=>{if(!rs.has()||!$('confirm').checked)return alert('Připoj podpis a potvrď správnost údajů.');load(true);const {error}=await supabase.rpc('sign_document',{p_token:T,p_signature:rs.get()});load(false);if(error)return alert(error.message);alert('Doklad byl podepsán a uzamčen.');openSign(T)};
-const svg=s=>{let p='';for(let x of s||[]){if(x.length<2)continue;let d='M '+x[0][0]+' '+x[0][1];for(let i=1;i<x.length;i++)d+=' L '+x[i][0]+' '+x[i][1];p+=`<path d="${d}" fill="none" stroke="#172019" stroke-width="2.2" stroke-linecap="round"/>`}return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 110">${p}</svg>`};
-$('pdf').onclick=()=>{let w=window.open('','_blank');if(!w)return;w.document.write(`<html><head><meta charset="utf-8"><style>body{font-family:Arial;max-width:760px;margin:40px auto;padding:20px}.box{border:1px solid #aaa;padding:16px;margin:18px 0}.s{display:flex;gap:35px;margin-top:35px}.q{flex:1;text-align:center;border-top:1px solid #777}svg{width:100%;height:110px}</style></head><body><h1>POTVRZENÍ O PLATBĚ</h1><p><b>Edennium, z.s.</b><br>IČO: 08142408</p><div class="box"><b>Číslo dokladu:</b> ${esc(D.document_number)}<br><b>Příjemce:</b> ${esc(D.recipient_name)}<br><b>Účel:</b> ${esc(D.payment_purpose)}<br><b>Částka:</b> ${Number(D.amount).toLocaleString('cs-CZ')} Kč<br><b>Stav:</b> ${stat(D.payment_status)}</div><div class="s"><div class="q">${svg(D.issuer_signature)}<br><b>${esc(D.issuer_name)}</b><br>Za Edennium, z.s.</div><div class="q">${svg(D.recipient_signature)}<br><b>${esc(D.recipient_name)}</b><br>Příjemce</div></div><script>onload=()=>setTimeout(()=>print(),300)<\/script></body></html>`);w.document.close()};
-if(location.hash.startsWith('#sign='))openSign(location.hash.slice(6));else admin();
-</script></body></html>
-<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Platby Edennium</title><style>
-:root{--g:#1f4d3d;--bg:#f4f5f2;--line:#d8ddd8}*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,sans-serif;color:#172019}main{max-width:900px;margin:auto;padding:20px}.card{background:#fff;border-radius:16px;padding:24px;margin-bottom:16px;box-shadow:0 3px 18px #00000012}.hidden{display:none!important}h1,h2{color:var(--g)}label{display:block;font-weight:bold;margin-top:12px;margin-bottom:5px}input,textarea,select{width:100%;padding:11px;border:1px solid var(--line);border-radius:8px;font-size:16px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}button{border:0;border-radius:8px;padding:12px 16px;font-weight:bold;cursor:pointer}.primary{background:var(--g);color:#fff}.secondary{background:#e8ece8}.danger{background:#f5e5e5;color:#8b2222}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.sig{width:100%;height:150px;border:2px dashed #9ca69f;border-radius:9px;touch-action:none}.banner{padding:14px;background:#eef6f1;border-left:4px solid var(--g);border-radius:7px;margin-bottom:15px}.muted{color:#657068}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left}.signed{color:#18733b;font-weight:bold}.waiting{color:#956000;font-weight:bold}#loading{position:fixed;inset:0;background:#ffffffdd;display:none;place-items:center;z-index:9;font-size:20px}@media(max-width:650px){.grid{grid-template-columns:1fr}.card{padding:16px}}
-</style></head><body><div id="loading">Načítání…</div><main>
-<section id="login" class="card"><h1>Platby Edennium</h1><p class="muted">Administrace dokladů a vzdálených podpisů</p><label>E-mail</label><input id="email" type="email"><label>Heslo</label><input id="password" type="password"><div class="actions"><button class="primary" id="loginBtn">Přihlásit se</button></div><p id="loginMsg"></p></section>
-<section id="admin" class="hidden"><div class="card"><div class="actions" style="justify-content:space-between"><h1 style="margin:0">Administrace Edennium</h1><button class="secondary" id="logout">Odhlásit</button></div></div>
-<div class="card"><h2>Nový doklad</h2><div class="grid"><div><label>Číslo dokladu</label><input id="docNo" placeholder="ED-2026-001"></div><div><label>Příjemce</label><input id="recipient"></div></div><label>Účel platby</label><textarea id="purpose" rows="2"></textarea><div class="grid"><div><label>Částka (Kč)</label><input id="amount" type="number" min="0" step="0.01"></div><div><label>Stav platby</label><select id="status"><option value="transfer_pending">Bankovním převodem – k vyplacení</option><option value="transfer_paid">Bankovním převodem – vyplaceno</option><option value="cash_paid">Hotově – vyplaceno</option></select></div></div><label>Datum úhrady / vyplacení</label>
-<input id="date" type="text" placeholder="např. 30. 8. 2026 (nebo ponech prázdné)"><label>Osoba jednající za Edennium</label><input id="issuer"><label>Podpis za Edennium</label><canvas id="issuerSig" class="sig"></canvas><div class="actions"><button class="danger" id="clearIssuer">Vymazat podpis</button><button class="primary" id="create">Vytvořit bezpečný podpisový odkaz</button></div><p id="created"></p></div>
-<div class="card"><h2>Doklady</h2><button class="secondary" id="refresh">↻ Obnovit</button><div style="overflow:auto"><table><thead><tr><th>Doklad</th><th>Příjemce</th><th>Částka</th><th>Stav</th><th></th></tr></thead><tbody id="docs"></tbody></table></div></div></section>
-<section id="sign" class="hidden"><div class="card"><h1>Potvrzení dokladu</h1><div id="detail"></div><div id="signControls"><label>Podpis příjemce</label><canvas id="recipientSig" class="sig"></canvas><div class="actions"><button class="danger" id="clearRecipient">Vymazat podpis</button></div><label style="font-weight:normal;display:flex;gap:8px"><input id="confirm" type="checkbox" style="width:auto">Potvrzuji správnost uvedených údajů a připojuji svůj podpis k tomuto konkrétnímu dokladu.</label><div class="actions"><button class="primary" id="signBtn">✓ Definitivně podepsat</button></div></div><div id="final" class="hidden"><div class="actions"><button class="primary" id="pdf">📄 Uložit jako PDF</button></div></div></div></section>
-</main>
-<script type="module">
-import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
-const supabase=createClient('https://prlbahgvgihtdfwfikrp.supabase.co','sb_publishable_uKx6LbKs2UbsdnJgugv21g_NknJYtLZ');
-const $=x=>document.getElementById(x), load=x=>$('loading').style.display=x?'grid':'none';
-function Sig(c,ro=false){const ctx=c.getContext('2d');let ss=[],cur,on=false;function draw(){let r=c.getBoundingClientRect();ctx.clearRect(0,0,r.width,r.height);ctx.strokeStyle='#172019';ctx.lineWidth=2.2;ctx.lineCap='round';for(let s of ss){if(s.length<2)continue;ctx.beginPath();ctx.moveTo(...s[0]);for(let i=1;i<s.length;i++)ctx.lineTo(...s[i]);ctx.stroke()}}function size(){let r=c.getBoundingClientRect(),d=devicePixelRatio||1;c.width=r.width*d;c.height=r.height*d;ctx.setTransform(d,0,0,d,0,0);draw()}function p(e){let r=c.getBoundingClientRect();return [+(e.clientX-r.left).toFixed(1),+(e.clientY-r.top).toFixed(1)]}if(!ro){c.onpointerdown=e=>{on=true;cur=[p(e)];ss.push(cur);c.setPointerCapture(e.pointerId)};c.onpointermove=e=>{if(on){cur.push(p(e));draw()}};c.onpointerup=()=>on=false;c.onpointercancel=()=>on=false}addEventListener('resize',size);setTimeout(size,100);return{get:()=>ss,set:x=>{ss=x||[];draw()},clear:()=>{ss=[];draw()},has:()=>ss.some(x=>x.length>1)}}
-const is=new Sig($('issuerSig')),rs=new Sig($('recipientSig'));$('clearIssuer').onclick=()=>is.clear();$('clearRecipient').onclick=()=>rs.clear();
-const esc=x=>String(x??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const stat=s=>s==='cash_paid'?'Hotově – vyplaceno':s==='transfer_paid'?'Bankovním převodem – vyplaceno':'Bankovním převodem – k vyplacení';
-const url=t=>location.origin+location.pathname+'#sign='+t;
-async function docs(){const {data,error}=await supabase.rpc('get_admin_documents');if(error){console.error(error);return}$('docs').innerHTML=(data||[]).map(d=>`<tr><td>${esc(d.document_number)}</td><td>${esc(d.recipient_name)}</td><td>${Number(d.amount).toLocaleString('cs-CZ')} Kč</td><td class="${d.document_status==='signed'?'signed':'waiting'}">${d.document_status==='signed'?'✓ Podepsáno':'Čeká na podpis'}</td><td><button class="secondary" data-t="${d.signing_token}">Kopírovat</button></td></tr>`).join('');document.querySelectorAll('[data-t]').forEach(b=>b.onclick=async()=>{await navigator.clipboard.writeText(url(b.dataset.t));alert('Odkaz zkopírován.')})}
-async function admin(){const {data:{session}}=await supabase.auth.getSession();if(session){$('login').classList.add('hidden');$('admin').classList.remove('hidden');docs()}}
-$('loginBtn').onclick=async()=>{load(true);const {error}=await supabase.auth.signInWithPassword({email:$('email').value,password:$('password').value});load(false);if(error)$('loginMsg').textContent=error.message;else admin()};
-$('logout').onclick=async()=>{await supabase.auth.signOut();location.reload()};$('refresh').onclick=docs;
-$('create').onclick=async()=>{if(!is.has())return alert('Připoj podpis za Edennium.');const a={p_document_number:$('docNo').value.trim(),p_recipient_name:$('recipient').value.trim(),p_payment_purpose:$('purpose').value.trim(),p_amount:Number($('amount').value),p_payment_status:$('status').value,p_payment_date:(function(v){v=v.trim();if(!v)return null;if(/^\d{4}-\d{2}-\d{2}$/.test(v))return v;let m=v.match(/^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})$/);return m?m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'):null})($('date').value),p_issuer_name:$('issuer').value.trim(),p_issuer_signature:is.get()};if(!a.p_document_number||!a.p_recipient_name||!a.p_payment_purpose||!Number.isFinite(a.p_amount)||!a.p_issuer_name)return alert('Vyplň všechna povinná pole.');
-if($('date').value.trim() && !a.p_payment_date)return alert('Datum zadej ve formátu DD. MM. RRRR, například 30. 8. 2026.');load(true);const {data,error}=await supabase.rpc('create_payment_document',a);load(false);if(error)return alert(error.message);let u=url(data[0].signing_token);$('created').innerHTML=`Doklad vytvořen. <a href="${u}" target="_blank">Otevřít podpisový odkaz</a>`;try{await navigator.clipboard.writeText(u);$('created').innerHTML+=' — odkaz byl zkopírován.'}catch(e){}docs()};
-let D,T;
-async function openSign(t){load(true);const {data,error}=await supabase.rpc('get_signed_document',{p_token:t});load(false);if(error||!data?.length){$('detail').innerHTML='<div class="banner">Doklad nebyl nalezen.</div>';return}D=data[0];T=t;$('login').classList.add('hidden');$('admin').classList.add('hidden');$('sign').classList.remove('hidden');$('detail').innerHTML=`<div class="banner"><b>Číslo dokladu:</b> ${esc(D.document_number)}<br><b>Příjemce:</b> ${esc(D.recipient_name)}<br><b>Účel:</b> ${esc(D.payment_purpose)}<br><b>Částka:</b> ${Number(D.amount).toLocaleString('cs-CZ')} Kč<br><b>Stav platby:</b> ${stat(D.payment_status)}<br><br><b>Za Edennium:</b> ${esc(D.issuer_name)}<br><canvas id="iv" class="sig" style="height:110px;margin-top:8px"></canvas></div>`;let v=new Sig($('iv'),true);v.set(D.issuer_signature);if(D.document_status==='signed'){$('signControls').classList.add('hidden');$('final').classList.remove('hidden');rs.set(D.recipient_signature)}}
-$('signBtn').onclick=async()=>{if(!rs.has()||!$('confirm').checked)return alert('Připoj podpis a potvrď správnost údajů.');load(true);const {error}=await supabase.rpc('sign_document',{p_token:T,p_signature:rs.get()});load(false);if(error)return alert(error.message);alert('Doklad byl podepsán a uzamčen.');openSign(T)};
-const svg=s=>{let p='';for(let x of s||[]){if(x.length<2)continue;let d='M '+x[0][0]+' '+x[0][1];for(let i=1;i<x.length;i++)d+=' L '+x[i][0]+' '+x[i][1];p+=`<path d="${d}" fill="none" stroke="#172019" stroke-width="2.2" stroke-linecap="round"/>`}return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 110">${p}</svg>`};
-$('pdf').onclick=()=>{let w=window.open('','_blank');if(!w)return;w.document.write(`<html><head><meta charset="utf-8"><style>body{font-family:Arial;max-width:760px;margin:40px auto;padding:20px}.box{border:1px solid #aaa;padding:16px;margin:18px 0}.s{display:flex;gap:35px;margin-top:35px}.q{flex:1;text-align:center;border-top:1px solid #777}svg{width:100%;height:110px}</style></head><body><h1>POTVRZENÍ O PLATBĚ</h1><p><b>Edennium, z.s.</b><br>IČO: 08142408</p><div class="box"><b>Číslo dokladu:</b> ${esc(D.document_number)}<br><b>Příjemce:</b> ${esc(D.recipient_name)}<br><b>Účel:</b> ${esc(D.payment_purpose)}<br><b>Částka:</b> ${Number(D.amount).toLocaleString('cs-CZ')} Kč<br><b>Stav:</b> ${stat(D.payment_status)}</div><div class="s"><div class="q">${svg(D.issuer_signature)}<br><b>${esc(D.issuer_name)}</b><br>Za Edennium, z.s.</div><div class="q">${svg(D.recipient_signature)}<br><b>${esc(D.recipient_name)}</b><br>Příjemce</div></div><script>onload=()=>setTimeout(()=>print(),300)<\/script></body></html>`);w.document.close()};
-if(location.hash.startsWith('#sign='))openSign(location.hash.slice(6));else admin();
-</script></body></html>
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+const {SUPABASE_URL,SUPABASE_ANON_KEY}=window.EDENNIUM_CONFIG;
+const sb=createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+const $=id=>document.getElementById(id);
+const loader=x=>$("loader").style.display=x?"grid":"none";
+
+function pad(canvas,readonly=false){
+ let strokes=[],active=false,current=null,ctx=canvas.getContext("2d");
+ function resize(){
+   const r=canvas.getBoundingClientRect(),d=devicePixelRatio||1;
+   canvas.width=Math.max(1,Math.round(r.width*d));canvas.height=Math.max(1,Math.round(r.height*d));
+   ctx.setTransform(d,0,0,d,0,0);draw();
+ }
+ function draw(){
+   const r=canvas.getBoundingClientRect();ctx.clearRect(0,0,r.width,r.height);
+   ctx.strokeStyle="#172019";ctx.lineWidth=2.3;ctx.lineCap="round";ctx.lineJoin="round";
+   strokes.forEach(s=>{if(s.length<2)return;ctx.beginPath();ctx.moveTo(...s[0]);for(let i=1;i<s.length;i++)ctx.lineTo(...s[i]);ctx.stroke()});
+ }
+ function pos(e){const r=canvas.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top]}
+ if(!readonly){
+  canvas.addEventListener("pointerdown",e=>{resize();active=true;current=[pos(e)];strokes.push(current);canvas.setPointerCapture?.(e.pointerId);e.preventDefault()});
+  canvas.addEventListener("pointermove",e=>{if(!active)return;current.push(pos(e));draw();e.preventDefault()});
+  ["pointerup","pointercancel","pointerleave"].forEach(ev=>canvas.addEventListener(ev,()=>active=false));
+ }
+ new ResizeObserver(resize).observe(canvas);setTimeout(resize,50);
+ return {get:()=>strokes,set:v=>{strokes=Array.isArray(v)?v:[];resize()},clear:()=>{strokes=[];draw()},has:()=>strokes.some(s=>s.length>1),refresh:resize};
+}
+const issuerPad=pad($("issuerCanvas")), recipientPad=pad($("recipientCanvas"));
+$("clearIssuer").onclick=()=>issuerPad.clear();$("clearRecipient").onclick=()=>recipientPad.clear();
+
+function paymentText(s){return s==="cash_paid"?"Hotově – vyplaceno":s==="transfer_paid"?"Bankovním převodem – vyplaceno":"Bankovním převodem – bude vyplaceno"}
+function statement(s){if(s==="cash_paid")return "Podpisem potvrzuji převzetí uvedené částky v hotovosti.";if(s==="transfer_pending")return "Podpisem potvrzuji správnost údajů tohoto dokladu a souhlas s následným vyplacením uvedené částky bankovním převodem.";return "Podpisem potvrzuji správnost údajů tohoto dokladu."}
+function esc(x){return String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+function signingUrl(token){return location.origin+location.pathname+"#sign="+encodeURIComponent(token)}
+function dateToggle(){ $("dateWrap").classList.toggle("hidden",$("paymentStatus").value==="transfer_pending");}
+$("paymentStatus").onchange=dateToggle;dateToggle();
+
+async function showAdmin(){
+ $("loginView").classList.add("hidden");$("signView").classList.add("hidden");$("adminView").classList.remove("hidden");
+ setTimeout(()=>issuerPad.refresh(),100);await loadDocuments();
+}
+async function loadDocuments(){
+ const {data,error}=await sb.rpc("admin_documents");
+ if(error){console.error(error);return alert("Chyba při načítání dokladů: "+error.message)}
+ $("documentList").innerHTML=(data||[]).map(d=>`<tr><td>${esc(d.document_number)}</td><td>${esc(d.recipient_name)}</td><td>${Number(d.amount).toLocaleString("cs-CZ")} Kč</td><td class="${d.document_status==="signed"?"signed":"waiting"}">${d.document_status==="signed"?"✓ Podepsáno":"Čeká"}</td><td><button class="secondary copyLink" data-token="${esc(d.signing_token)}">Kopírovat</button></td></tr>`).join("");
+ document.querySelectorAll(".copyLink").forEach(b=>b.onclick=async()=>{try{await navigator.clipboard.writeText(signingUrl(b.dataset.token));alert("Odkaz zkopírován.");}catch{prompt("Zkopíruj odkaz:",signingUrl(b.dataset.token))}});
+}
+$("loginBtn").onclick=async()=>{
+ loader(true);const {error}=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});loader(false);
+ if(error){$("loginMessage").className="error";$("loginMessage").textContent=error.message;return}showAdmin();
+};
+$("logoutBtn").onclick=async()=>{await sb.auth.signOut();location.reload()};
+$("refreshBtn").onclick=loadDocuments;
+
+$("createBtn").onclick=async()=>{
+ const p={p_document_number:$("docNumber").value.trim(),p_recipient_name:$("recipientName").value.trim(),p_payment_purpose:$("purpose").value.trim(),p_amount:Number($("amount").value),p_payment_status:$("paymentStatus").value,p_payment_date:$("paymentStatus").value==="transfer_pending"?null:($("paymentDate").value||null),p_issuer_name:$("issuerName").value.trim(),p_issuer_signature:issuerPad.get()};
+ if(!p.p_document_number||!p.p_recipient_name||!p.p_payment_purpose||!Number.isFinite(p.p_amount)||!p.p_issuer_name){return alert("Vyplň všechna povinná pole.")}
+ if(!issuerPad.has())return alert("Připoj podpis za Edennium.");
+ loader(true);const {data,error}=await sb.rpc("create_payment_document",p);loader(false);
+ if(error)return alert("Doklad se nepodařilo vytvořit: "+error.message);
+ const row=Array.isArray(data)?data[0]:data;const u=signingUrl(row.signing_token);
+ $("createMessage").className="ok";$("createMessage").textContent="✓ Doklad byl vytvořen. Podpisový odkaz byl zkopírován.";
+ try{await navigator.clipboard.writeText(u)}catch{}
+ await loadDocuments();
+};
+
+let current=null,token=null;
+async function showSigning(t){
+ loader(true);const {data,error}=await sb.rpc("get_document_for_signing",{p_token:t});loader(false);
+ $("loginView").classList.add("hidden");$("adminView").classList.add("hidden");$("signView").classList.remove("hidden");
+ if(error||!data||!data.length){$("documentDetail").innerHTML='<p class="error">Tento podpisový odkaz není platný nebo doklad neexistuje.</p>';return}
+ current=data[0];token=t;
+ const d=current;
+ $("documentDetail").innerHTML=`<div class="notice"><b>Číslo dokladu:</b> ${esc(d.document_number)}<br><b>Příjemce:</b> ${esc(d.recipient_name)}<br><b>Účel:</b> ${esc(d.payment_purpose)}<br><b>Částka:</b> ${Number(d.amount).toLocaleString("cs-CZ")} Kč<br><b>Stav platby:</b> ${esc(paymentText(d.payment_status))}${d.payment_date?`<br><b>Datum:</b> ${esc(d.payment_date)}`:""}<br><br><b>Za Edennium:</b> ${esc(d.issuer_name)}<br><canvas id="issuerPreview" class="signature" style="height:110px;margin-top:8px"></canvas><p>${esc(statement(d.payment_status))}</p></div>`;
+ const preview=pad($("issuerPreview"),true);preview.set(d.issuer_signature);
+ if(d.document_status==="signed"){
+   recipientPad.set(d.recipient_signature);$("recipientArea").classList.add("hidden");$("finishedArea").classList.remove("hidden");
+ }else{ $("recipientArea").classList.remove("hidden");$("finishedArea").classList.add("hidden");setTimeout(()=>recipientPad.refresh(),100);}
+}
+$("signBtn").onclick=async()=>{
+ if(!recipientPad.has())return alert("Připoj svůj podpis.");if(!$("confirmation").checked)return alert("Potvrď správnost údajů.");
+ loader(true);const {error}=await sb.rpc("sign_payment_document",{p_token:token,p_recipient_signature:recipientPad.get()});loader(false);
+ if(error)return alert("Podpis se nepodařilo uložit: "+error.message);
+ await showSigning(token);
+};
+function svg(strokes){let paths="";(strokes||[]).forEach(s=>{if(s.length<2)return;let d=`M ${s[0][0]} ${s[0][1]}`;for(let i=1;i<s.length;i++)d+=` L ${s[i][0]} ${s[i][1]}`;paths+=`<path d="${d}" fill="none" stroke="#172019" stroke-width="2.3" stroke-linecap="round"/>`});return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 150">${paths}</svg>`}
+$("pdfBtn").onclick=()=>{
+ const d=current,w=window.open("","_blank");if(!w)return;
+ w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(d.document_number)}</title><style>body{font-family:Arial;max-width:760px;margin:40px auto;padding:20px;line-height:1.5}.box{border:1px solid #999;padding:16px;margin:20px 0}.signatures{display:flex;gap:35px;margin-top:45px}.signature{width:50%;text-align:center;border-top:1px solid #777}svg{width:100%;height:120px}</style></head><body><h1>POTVRZENÍ O PLATBĚ</h1><p><b>Edennium, z.s.</b><br>IČO: 08142408</p><div class="box"><b>Číslo dokladu:</b> ${esc(d.document_number)}<br><b>Příjemce:</b> ${esc(d.recipient_name)}<br><b>Účel platby:</b> ${esc(d.payment_purpose)}<br><b>Částka:</b> ${Number(d.amount).toLocaleString("cs-CZ")} Kč<br><b>Stav:</b> ${esc(paymentText(d.payment_status))}</div><p>${esc(statement(d.payment_status))}</p><div class="signatures"><div class="signature">${svg(d.issuer_signature)}<br><b>${esc(d.issuer_name)}</b><br>Za Edennium, z.s.</div><div class="signature">${svg(d.recipient_signature)}<br><b>${esc(d.recipient_name)}</b><br>Příjemce</div></div><script>onload=()=>setTimeout(()=>print(),300)<\/script></body></html>`);
+ w.document.close();
+};
+
+const hash=location.hash;
+if(hash.startsWith("#sign=")){showSigning(decodeURIComponent(hash.slice(6)))}else{
+ const {data:{session}}=await sb.auth.getSession();if(session)showAdmin();
+}
+</script>
+</body></html>
