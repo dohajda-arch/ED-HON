@@ -176,26 +176,57 @@ $("signBtn").onclick=async()=>{
  if(error)return alert("Podpis se nepodařilo uložit: "+error.message);
  await showSigning(token);
 };
-function svg(strokes){
- const points=(strokes||[]).flat().filter(p=>Array.isArray(p)&&p.length===2);
- if(!points.length)return "";
- let minX=Math.min(...points.map(p=>p[0])), maxX=Math.max(...points.map(p=>p[0]));
- let minY=Math.min(...points.map(p=>p[1])), maxY=Math.max(...points.map(p=>p[1]));
- const pad=12;
- minX-=pad; minY-=pad; maxX+=pad; maxY+=pad;
- const width=Math.max(1,maxX-minX), height=Math.max(1,maxY-minY);
- let paths="";
+function signaturePng(strokes){
+ const pts=(strokes||[]).flat().filter(p=>Array.isArray(p)&&p.length===2);
+ if(!pts.length)return "";
+ const pad=14;
+ const minX=Math.min(...pts.map(p=>p[0]))-pad;
+ const maxX=Math.max(...pts.map(p=>p[0]))+pad;
+ const minY=Math.min(...pts.map(p=>p[1]))-pad;
+ const maxY=Math.max(...pts.map(p=>p[1]))+pad;
+ const w=Math.max(80,maxX-minX), h=Math.max(50,maxY-minY);
+ const scale=3;
+ const c=document.createElement("canvas");
+ c.width=Math.ceil(w*scale); c.height=Math.ceil(h*scale);
+ const ctx=c.getContext("2d");
+ ctx.scale(scale,scale);
+ ctx.strokeStyle="#172019"; ctx.lineWidth=2.3; ctx.lineCap="round"; ctx.lineJoin="round";
  (strokes||[]).forEach(s=>{
    if(!s||s.length<2)return;
-   let d=`M ${s[0][0]} ${s[0][1]}`;
-   for(let i=1;i<s.length;i++)d+=` L ${s[i][0]} ${s[i][1]}`;
-   paths+=`<path d="${d}" fill="none" stroke="#172019" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>`;
+   ctx.beginPath();
+   ctx.moveTo(s[0][0]-minX,s[0][1]-minY);
+   for(let i=1;i<s.length;i++)ctx.lineTo(s[i][0]-minX,s[i][1]-minY);
+   ctx.stroke();
  });
- return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${width} ${height}" preserveAspectRatio="xMidYMid meet">${paths}</svg>`;
+ return c.toDataURL("image/png");
 }
+
 $("pdfBtn").onclick=()=>{
  const d=current,w=window.open("","_blank");if(!w)return;
- w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(d.document_number)}</title><style>body{font-family:Arial;max-width:760px;margin:40px auto;padding:20px;line-height:1.5}.box{border:1px solid #999;padding:16px;margin:20px 0}.signatures{display:flex;gap:35px;margin-top:45px}.signature{width:50%;text-align:center;border-top:1px solid #777;overflow:hidden}svg{width:100%;height:120px;display:block;margin:auto}</style></head><body><h1>POTVRZENÍ O PLATBĚ</h1><p><b>Edennium, z.s.</b><br>IČO: 08142408</p><div class="box"><b>Číslo dokladu:</b> ${esc(d.document_number)}<br><b>Příjemce:</b> ${esc(d.recipient_name)}<br><b>Účel platby:</b> ${esc(d.payment_purpose)}<br><b>Částka:</b> ${Number(d.amount).toLocaleString("cs-CZ")} Kč<br><b>Stav:</b> ${esc(paymentText(d.payment_status))}</div><p>${esc(statement(d.payment_status))}</p><div class="signatures"><div class="signature">${svg(d.issuer_signature)}<br><b>${esc(d.issuer_name)}</b><br>Za Edennium, z.s.</div><div class="signature">${svg(d.recipient_signature)}<br><b>${esc(d.recipient_name)}</b><br>Příjemce</div></div><script>onload=()=>setTimeout(()=>print(),300)<\/script></body></html>`);
+ const issuerImg=signaturePng(d.issuer_signature);
+ const recipientImg=signaturePng(d.recipient_signature);
+ w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(d.document_number)}</title>
+ <style>
+ body{font-family:Arial;max-width:760px;margin:40px auto;padding:20px;line-height:1.5}
+ .box{border:1px solid #999;padding:16px;margin:20px 0}
+ .signatures{display:flex;gap:35px;margin-top:45px;align-items:flex-start}
+ .signature{width:50%;min-width:0;text-align:center;border-top:1px solid #777;padding-top:4px}
+ .sigimg{display:block;width:100%;height:120px;object-fit:contain;object-position:center bottom}
+ @media print{body{margin:15mm auto;max-width:none}}
+ </style></head><body>
+ <h1>POTVRZENÍ O PLATBĚ</h1>
+ <p><b>Edennium, z.s.</b><br>IČO: 08142408</p>
+ <div class="box"><b>Číslo dokladu:</b> ${esc(d.document_number)}<br>
+ <b>Příjemce:</b> ${esc(d.recipient_name)}<br>
+ <b>Účel platby:</b> ${esc(d.payment_purpose)}<br>
+ <b>Částka:</b> ${Number(d.amount).toLocaleString("cs-CZ")} Kč<br>
+ <b>Stav:</b> ${esc(paymentText(d.payment_status))}</div>
+ <p>${esc(statement(d.payment_status))}</p>
+ <div class="signatures">
+   <div class="signature"><img class="sigimg" src="${issuerImg}" alt="Podpis za Edennium"><b>${esc(d.issuer_name)}</b><br>Za Edennium, z.s.</div>
+   <div class="signature"><img class="sigimg" src="${recipientImg}" alt="Podpis příjemce"><b>${esc(d.recipient_name)}</b><br>Příjemce</div>
+ </div>
+ <script>onload=()=>setTimeout(()=>print(),300)<\/script></body></html>`);
  w.document.close();
 };
 
